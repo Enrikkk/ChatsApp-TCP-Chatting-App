@@ -97,9 +97,6 @@ java --module-path /path/to/javafx-sdk-25/lib --add-modules javafx.controls,java
 
 ---
 
-
----
-
 ## 📜 License
 
 This project was created for educational purposes as part of **CSCI 4311** at the **University of New Orleans**.
