@@ -1,0 +1,96 @@
+package communication;
+
+import java.net.*;
+import application.ChatUI;
+
+import java.io.*;
+
+public class ClientReceiver extends Thread {
+
+	// Used to receive messages from the server, and then write them on screen.
+	
+	// Atributes
+	// We only need a way to get the input, since this thread won't send any message to the server.
+	// It will only receive them.
+	// We will also need the correspondent chatui.
+	private BufferedReader in;
+	private ChatUI chatui;
+	private ClientSender sender;
+	private String username;
+	
+	// Constructor
+	public ClientReceiver(Socket socket, ChatUI chatui, String username, ClientSender sender) 
+						throws UnknownHostException, IOException {
+		this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+		this.chatui = chatui;
+		this.sender = sender;
+		this.username = username;
+	}
+	
+	@Override
+	public void run() {
+		
+		String message = "";
+		
+		// Now, this thread only has to receive messages from the server.
+		// This thread will be running until it's father thread closes him.
+		while(true) {
+			
+			try {
+				message = in.readLine();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+			// Safety mechanism.
+			if (message == null || message.isEmpty()) {
+			    continue;
+			}
+			
+			// We will use the first character of message to indentify 
+			// who sent it, in order to apply the styling.
+			message = this.treatMessage(message);
+			
+			// Managing closing of the window by force.
+			// Managing what to do if the chatui gets closed by force (X button).
+			this.chatui.setOnExitCallback(() -> {
+				
+				try { this.sender.sendMsg("Bye"); } catch (IOException e) { e.printStackTrace(); }
+				
+				this.sender.closeWindow();
+				
+				sender.stopClient();
+				return;
+			});
+			
+			// We stop the thread if we want to disconnect or if the server 
+			// gets suddenly disconnected.
+			// Since this already ends the ClientServer thread, we do not need 
+			// to add any further code to end it.
+			if(message.equals("Bye") || message.equals("Server is Being Closed - Bye")) {
+				sender.stopClient();
+				return;
+			}
+		}
+		
+	}
+	
+	public String treatMessage(String message) {
+		char who = message.charAt(0);
+		message = message.substring(1);
+		
+		String type = "";
+		
+		if(who == 'S') 
+			type = "server";
+		else if(who == 'I')
+			type = "in";
+		else if(who == 'O')
+			type = "out";
+
+		this.chatui.appendMessage(message, type);
+		
+		return message;
+	}
+	
+}

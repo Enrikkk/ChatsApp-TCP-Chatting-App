@@ -1,0 +1,79 @@
+package communication;
+
+import java.net.*;
+import application.ChatUI;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+
+import java.io.*;
+
+public class ClientReceiver extends Thread {
+
+	// Used to receive messages from the server, and then write them on screen.
+
+	// Atributes
+	// We only need a way to get the input, since this thread won't send any message
+	// to the server.
+	// It will only receive them.
+	// We will also need the correspondent chatui.
+	private BufferedReader in;
+	private ChatUI chatui;
+	private ClientSender sender;
+
+	// Constructor
+	public ClientReceiver(Socket socket, ChatUI chatui, ClientSender sender, Stage originalStage, 
+								         Scene originalScene) throws UnknownHostException, IOException {
+		this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+		this.chatui = chatui;
+		this.sender = sender;
+	}
+
+	@Override
+	public void run() {
+
+		// Now, this thread only has to receive messages from the server and
+		// act based on the message received.
+		while (true) {
+			String message;
+			try {
+				message = in.readLine();
+			} catch (IOException e) {
+				break; // exit if socket closed
+			}
+
+			if (message == null || message.equals("")) {
+				continue;
+			}
+
+			message = treatMessage(message);
+
+			if (message.equals("Bye") || message.equals("Server is Being Closed - Bye")) {
+				this.sender.closeConnection();
+				return;
+			}
+		}
+
+	}
+
+	// Method to treat messages, it's main function is to get the slice the message received
+	// in order to detect which type of message it is (to see how it should be appended in the text area).
+	public String treatMessage(String message) {
+
+		char who = message.charAt(0);
+		message = message.substring(1);
+
+		String type = "";
+
+		if (who == 'S')
+			type = "server";
+		else if (who == 'I')
+			type = "in";
+		else if (who == 'O')
+			type = "out";
+
+		this.chatui.appendMessage(message, type);
+
+		return message;
+	}
+
+}

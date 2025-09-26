@@ -1,0 +1,147 @@
+/* This will be css file used to style de UI. */
+
+/* Global app background */
+.root {
+    -fx-background-color: #f9fafb; /* very light gray */
+    -fx-font-family: "Montserrat", "Segoe UI", sans-serif;
+}
+
+/* Title texts */
+.main-title {
+    -fx-font-size: 28px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #2c3e50; /* dark slate */
+}
+
+.subtitle {
+    -fx-font-size: 18px;
+    -fx-font-weight: 400;
+    -fx-text-fill: #6b7280; /* subtle gray */
+}
+
+/* Buttons */
+.initial-btn {
+    -fx-background-color: linear-gradient(to bottom, #3b82f6, #2563eb); /* blue */
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-font-weight: 600;
+    -fx-padding: 10px 20px;
+    -fx-background-radius: 8;
+    -fx-cursor: hand;
+}
+.initial-btn:hover {
+    -fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+}
+.initial-btn:active {
+	-fx-background-color: linear-gradient(to bottom, #2563eb, #1d4ed8);
+	-fx-effect: innershadow(gaussian, rgba(0,0,0,0.4), 5, 0, 2, 2);
+}
+
+/* Chat message area */
+.chat-area {
+    -fx-background-color: white;
+    -fx-padding: 15px;
+    -fx-border-color: #e5e7eb; /* light border */
+    -fx-border-radius: 10;
+    -fx-background-radius: 10;
+    -fx-font-size: 14px;
+    -fx-text-fill: #111827;
+	-fx-border-color: black;
+	-fx-border-width: 1px;
+	-fx-effect: innershadow(gaussian, rgba(0,0,0,0.4), 4, 0, 2, 2);
+}
+
+/* Own messages */
+.message-out {
+    -fx-background-color: #3b82f6; /* blue bubble */
+    -fx-text-fill: white;
+    -fx-padding: 8px 12px;
+    -fx-background-radius: 12 12 0 12;
+    -fx-alignment: center-right;
+    -fx-font-size: 14px;
+}
+
+/* Incoming messages */
+.message-in {
+    -fx-background-color: #e5e7eb; /* gray bubble */
+    -fx-text-fill: #111827;
+    -fx-padding: 8px 12px;
+    -fx-background-radius: 12 12 12 0;
+    -fx-alignment: center-left;
+    -fx-font-size: 14px;
+}
+
+/* Server Message */
+/* The same as message-in but bold, to distinguis importatn server messages. */
+.message-server {
+    -fx-background-color: #e5e7eb; /* gray bubble */
+    -fx-text-fill: #111827;
+    -fx-padding: 8px 12px;
+    -fx-background-radius: 12 12 12 0;
+    -fx-alignment: center-left;
+    -fx-font-size: 14px;
+	-fx-font-weight: bold;
+}
+
+.message-normal {
+    -fx-background-color: #e5e7eb; 
+    -fx-text-fill: #111827;
+    -fx-padding: 8px 12px;
+    -fx-background-radius: 12 12 12 0;
+    -fx-alignment: center-left;
+    -fx-font-size: 14px;
+}
+
+/* Input field */
+.chat-input {
+    -fx-background-color: #f3f4f6;
+    -fx-border-color: #d1d5db;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 8px;
+    -fx-font-size: 14px;
+}
+.chat-input.focus {
+	-fx-border-color: black;
+	-fx-background-color: #dcdde0;
+	-fx-effect: innershadow(gaussian, rgba(0,0,0,0.4), 3, 0, 1, 1);
+}
+
+/* Send button */
+.send-btn {
+    -fx-background-color: #15d696;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+	-fx-background-radius: 10px;
+	-fx-border-color: black;
+	-fx-border-width: 3px;
+	-fx-border-radius: 10px;
+    -fx-padding: 8px 16px;
+}
+
+.send-btn:hover {
+    -fx-background-color: #059669;
+}
+.send-btn:active {
+	-fx-background-color: #059669;
+	-fx-effect: innershadow(gaussian, rgba(0,0,0,0.4), 5, 0, 2, 2);
+}
+
+/* Exit Button */
+.exit-btn {
+    -fx-background-color: #e4e7ed;
+    -fx-text-fill: black;
+    -fx-font-weight: bold;
+    -fx-background-radius: 6;
+    -fx-padding: 8px 16px;
+	-fx-border-color: black;
+	-fx-border-width: 2px;
+	-fx-border-radius: 6;
+}
+.exit-btn:hover {
+    -fx-background-color: #cf3723;
+}
+.exti-btn:active {
+	-fx-background-color: #cf3723;
+	-fx-effect: innershadow(gaussian, rgba(0,0,0,0.4), 5, 0, 2, 2);
+}

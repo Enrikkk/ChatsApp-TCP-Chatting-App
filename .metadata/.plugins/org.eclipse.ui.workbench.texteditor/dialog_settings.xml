@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section name="Workbench">
+	<item key="hasShownOverlayPopupBefore" value="true"/>
+	<section name="java.lang.Class">
+		<item key="replaceBarOpen" value="false"/>
+		<item key="wrap" value="true"/>
+		<item key="casesensitive" value="false"/>
+		<item key="wholeword" value="false"/>
+		<item key="incremental" value="false"/>
+		<item key="isRegEx" value="false"/>
+		<list key="findhistory">
+			<item value="read"/>
+			<item value="communicateC"/>
+			<item value="closeSer"/>
+			<item value="clients"/>
+			<item value="close"/>
+			<item value="NameSo"/>
+			<item value="NameS"/>
+			<item value="Exit S"/>
+			<item value="S"/>
+			<item value="Exit"/>
+			<item value="closed"/>
+			<item value="closeBye"/>
+			<item value="sender"/>
+			<item value="system"/>
+			<item value="Bye"/>
+		</list>
+		<list key="replacehistory">
+			<item value="LocalDateTime"/>
+		</list>
+	</section>
+	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="20"/>
+		<item key="DIALOG_Y_ORIGIN" value="20"/>
+		<item key="DIALOG_WIDTH" value="402"/>
+		<item key="DIALOG_HEIGHT" value="450"/>
+		<item key="DIALOG_FONT_NAME" value="1|Ubuntu Sans|11.0|0|GTK|1|"/>
+	</section>
+	<section name="org.eclipse.ui.texteditor.GotoLineAction$GotoLineDialog_dialogBounds">
+		<item key="DIALOG_X_ORIGIN" value="20"/>
+		<item key="DIALOG_Y_ORIGIN" value="20"/>
+	</section>
+</section>

@@ -1,0 +1,71 @@
+package communication;
+
+import java.net.*;
+import java.util.concurrent.Semaphore;
+import application.ChatUI;
+import java.io.*;
+
+public class ClientReceiver extends Thread {
+
+    private BufferedReader in;
+    private ChatUI chatui;
+    private ClientSender sender;
+    private String username;
+    private Semaphore textSemaphore;
+
+    public ClientReceiver(Socket socket, ChatUI chatui, String username, Semaphore textSemaphore, ClientSender sender) 
+                        throws UnknownHostException, IOException {
+        this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        this.chatui = chatui;
+        this.sender = sender;
+        this.textSemaphore = textSemaphore;
+        this.username = username;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            String message = null;
+            try {
+                message = in.readLine();
+            } catch (IOException e) {
+                break; // socket closed, exit
+            }
+            if (message == null || message.isEmpty()) {
+                continue;
+            }
+
+            String body = treatMessage(message);
+
+            // graceful exit conditions
+            if (body.equals("Bye") || body.equals("Server is Being Closed - Bye")) {
+                sender.stopClient();
+                return;
+            }
+        }
+    }
+
+    private String treatMessage(String message) {
+        if (message == null || message.isEmpty()) return "";
+
+        char who = message.charAt(0);
+        String body = message.length() > 1 ? message.substring(1) : "";
+
+        String type;
+        switch (who) {
+            case 'S': type = "server"; break;
+            case 'I': type = "in";     break;
+            case 'O': type = "out";    break;
+            default:
+                type = "server"; // fallback
+                body = message;
+                break;
+        }
+
+        try { this.textSemaphore.acquire(); } catch (InterruptedException e) { return body; }
+        this.chatui.appendMessage(body, type);
+        this.textSemaphore.release();
+
+        return body;
+    }
+}

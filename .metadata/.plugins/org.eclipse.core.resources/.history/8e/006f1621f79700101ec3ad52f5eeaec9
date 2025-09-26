@@ -1,0 +1,66 @@
+package communication;
+
+import java.io.*;
+import java.net.*;
+import java.util.LinkedList;
+
+import application.ChatUI;
+
+public class ServerThread extends Thread {
+
+    private Socket socket;
+    private BufferedReader in;
+    private PrintWriter out;
+    private ChatUI chatui;
+    private ServerAttender server;
+    private String username;
+    private volatile boolean running = true;
+
+    public ServerThread(Socket socket, ChatUI chatui, ServerAttender server) throws IOException {
+        this.socket = socket;
+        this.chatui = chatui;
+        this.server = server;
+        this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        this.out = new PrintWriter(socket.getOutputStream(), true);
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (running) {
+                String message = in.readLine();
+                if (message == null) break;
+
+                if (message.startsWith("U")) {
+                    username = message.substring(1);
+                    chatui.appendMessage(username + " joined the chat", "server");
+                    server.broadcast("S" + username + " joined the chat", this);
+                } else if (message.startsWith("O")) {
+                    String body = message.substring(1);
+                    if (body.equals("Bye")) {
+                        chatui.appendMessage(username + " left the chat", "server");
+                        server.broadcast("S" + username + " left the chat", this);
+                        stopThread();
+                        break;
+                    }
+                    chatui.appendMessage(username + ": " + body, "in");
+                    server.broadcast("I" + username + ": " + body, this);
+                }
+            }
+        } catch (IOException e) {
+            // client disconnected abruptly
+        } finally {
+            stopThread();
+        }
+    }
+
+    public void sendMessage(String message) {
+        out.println(message);
+    }
+
+    public void stopThread() {
+        running = false;
+        try { socket.close(); } catch (IOException ignored) {}
+        server.removeClient(this);
+    }
+}

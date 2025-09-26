@@ -1,0 +1,151 @@
+package application;
+
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.concurrent.ExecutionException;
+
+import communication.*;
+
+import javafx.application.Application;
+import javafx.geometry.Pos;
+import javafx.stage.Stage;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.TextInputDialog;
+import javafx.scene.image.Image;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
+
+
+public class Menu extends Application {
+	
+	// Atributes.
+	private Stage originalStage;
+	private Scene originalScene;
+	private String css = getClass().getResource("styles.css").toExternalForm(); // To apply css.
+	
+	@Override
+	public void start(Stage stage) throws Exception {
+		// First, we will make a couple of buttons, to decide whether we join or host a chat group.
+		Button hostBtn = new Button("Host Chat");
+		hostBtn.getStyleClass().add("initial-btn");
+		
+		Button joinBtn = new Button("Join Chat");
+		joinBtn.getStyleClass().add("initial-btn");
+		
+		// Now, let's set listening methods for the buttons.
+		hostBtn.setOnAction(_ -> {
+			try {
+				startServer(stage);
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			} catch (InterruptedException e1) {
+				e1.printStackTrace();
+			}
+		});
+		
+		joinBtn.setOnAction(_ -> {
+			try {
+				startClient(stage);
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+		});
+		
+		// Now, let's place the buttons and get the stage created.
+		HBox buttons = new HBox(20);
+		buttons.getChildren().addAll(hostBtn, joinBtn);
+        buttons.setAlignment(Pos.CENTER);
+
+        Text mainText1 = new Text("Welcome!");
+        mainText1.getStyleClass().add("main-title");
+        Text mainText2 = new Text("What do you want to do?");
+        mainText2.getStyleClass().add("subtitle");
+        
+        VBox root = new VBox(30, mainText1, mainText2, buttons);
+        root.setAlignment(Pos.CENTER);
+
+        Scene scene1 = new Scene(root, 500, 250);
+        scene1.getStylesheets().add(css);
+        stage.setTitle("ChatsApp Menu");
+        
+        stage.setFullScreen(true);
+        stage.setScene(scene1);
+        stage.show();
+		
+        // Data that we will use to bring back the menu screen once the users leaves a joined chat.
+        this.originalStage = stage;
+        this.originalScene = scene1;
+	}
+	
+	// Now let's get with the private methods.
+	// Function to start a server thread.
+	private void startServer(Stage stage) throws IOException, InterruptedException {
+		
+		// In this case, we will ask for the port in which the server will be hosted.
+		TextInputDialog dialog = new TextInputDialog();
+		dialog.setHeaderText("In Which Port Wil You Like Launching the Server at?");
+		int port = Integer.parseInt(dialog.showAndWait().orElse(null));
+		
+		LinkedList<String> messages = new LinkedList<String>();
+		
+		ChatUI chatui = new ChatUI(true, messages, this.originalStage,this.originalScene);
+		stage.setTitle("Chat Log");
+		stage.setScene(chatui.getScene());
+		
+		// Use a new temporary thread to start the server.
+		new Thread(() -> {
+	        try {
+	        	ServerAttender server = new ServerAttender(port, chatui, stage, this.originalScene);
+	        	
+	        	chatui.setOnExitCallback(() -> server.closeServer());
+	        	
+	    		server.start();
+	        } catch (IOException | InterruptedException e) {
+	            e.printStackTrace();
+	        }
+	    }).start();
+	}
+	
+	// Function to start a client thread.
+	private void startClient(Stage stage) throws IOException {
+		// The same as the serve case, but with the corresponding input.
+		TextInputDialog dialog1 = new TextInputDialog();
+		dialog1.setHeaderText("In Which IP is the Chat at?");
+		String ip = dialog1.showAndWait().orElse(null);
+		
+		TextInputDialog dialog2 = new TextInputDialog();
+		dialog2.setHeaderText("In Which Port is the Chat at?");
+		int port = Integer.parseInt(dialog2.showAndWait().orElse(null));
+		
+		LinkedList<String> messages = new LinkedList<String>();
+		
+		ChatUI chatui = new ChatUI(false, messages, this.originalStage, this.originalScene);
+		stage.setScene(chatui.getScene());
+		
+		stage.setTitle("Chat Group");
+		
+		// Use a new temporary thread to start the Client.
+		new Thread(() -> {
+	        try {
+	        	ClientSender client = new ClientSender(ip, port, chatui, stage, this.originalScene);
+	    		client.start();
+	        } catch (IOException e) {
+	            e.printStackTrace();
+	        } catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (ExecutionException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+	    }).start();
+	}
+
+	public static void main(String[] args) {
+		launch(args);
+	}
+
+}

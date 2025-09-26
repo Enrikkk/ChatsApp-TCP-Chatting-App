@@ -1,0 +1,255 @@
+package communication;
+
+import java.net.*;
+import java.io.*;
+import java.util.ArrayList;
+import java.util.concurrent.Semaphore; // To synchronize.
+import application.ChatUI;
+import java.time.*;
+
+public class ServerThread extends Thread {
+
+    // Variables
+    private Socket socket;
+    private BufferedReader in;
+    private BufferedWriter out;
+    private String username;
+    private ArrayList<NameSocket> clients;
+    private NameSocket actualClient;
+    private ChatUI chatui;
+
+    // Control variables.
+    private Integer numRead;
+    private Integer numReadWait;
+    private Boolean writing;
+    private Integer numWriWait;
+    
+    // Semaphores.
+    private Semaphore mutex; 
+    private Semaphore read; 
+    private Semaphore write; 
+    private Semaphore screen;
+    
+    // Time formatting
+    private timeFormatter hourFormatter;
+    private timeFormatter hourDateFormatter;
+
+    // Control flags
+    private volatile boolean running = true;
+    private volatile boolean closed = false;
+
+    // Constructor
+    public ServerThread(Integer numRead, Integer numReadWait, Boolean writing, Integer numWriWait, 
+            Semaphore mutex, Semaphore read, Semaphore write, Semaphore screen, Socket socket, 
+            ArrayList<NameSocket> clients, ChatUI chatui) throws IOException {
+        this.numRead = numRead;
+        this.numReadWait = numReadWait;
+        this.writing = writing;
+        this.numWriWait = numWriWait;
+        this.mutex = mutex;
+        this.read = read;
+        this.screen = screen;
+        this.write = write;
+        this.socket = socket;
+        this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        this.out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+        this.clients = clients;
+        this.hourFormatter = new timeFormatter("hour");
+        this.hourDateFormatter = new timeFormatter("hourDate");
+        this.chatui = chatui;
+    }
+
+    @Override
+    public void run() {
+        try {
+            // First, get username.
+            this.username = in.readLine();
+            
+            // Critical section: add client to client list.
+            try { mutex.acquire(); } catch (InterruptedException e) { e.printStackTrace(); }
+            if (numRead > 0 || writing) {
+                ++numWriWait;
+                mutex.release();
+                try { mutex.acquire(); } catch (InterruptedException e) { e.printStackTrace(); }
+                --numWriWait;
+            }
+            writing = true;
+            mutex.release();
+
+            this.actualClient = new NameSocket(this.username, LocalDateTime.now(), socket);
+            clients.add(actualClient);
+
+            // Exit protocol.
+            try { mutex.acquire(); } catch (InterruptedException e) { e.printStackTrace(); }
+            writing = false;
+            if (numWriWait > 0) write.release();
+            else if (numReadWait > 0) read.release();
+            else mutex.release();
+
+            // Send Welcome message.
+            String msg = this.hourFormatter.format(LocalDateTime.now()) + " | Welcome " + this.username;
+            try { screen.acquire(); } catch (InterruptedException e) { e.printStackTrace(); }
+            this.chatui.appendMessage(msg, "server");
+            screen.release();
+
+            // Broadcast welcome of the new client to all active clients.
+            // The letter "S" is just to signal styling to the client.
+            broadcast("S" + msg);
+
+            String line;
+            while (running && (line = in.readLine()) != null) {
+            	// Here, we check if the user inserted Bye.
+            	// In that case, we end the execution of the server thread (handleMessage returns true).
+                if(handleMessage(line))
+                	this.closeBye();
+            }
+        } catch (IOException e) {
+            // Client disconnected unexpectedly or socket closed.
+        	// We close the connection in that case.
+        } finally {
+        	close(); // Treat unexpected closing.
+        }
+    }
+
+    // Method to handle the messages received from the server.
+    private boolean handleMessage(String line) {
+        String messageOut = "";
+        switch(line) {
+            case "Bye":
+                try { screen.acquire(); } catch (InterruptedException e) { e.printStackTrace(); }
+                // Write on server log that the client disconnected with a Bye message.
+                this.chatui.appendMessage(this.hourFormatter.format(LocalDateTime.now()) 
+                                + " | " + this.username  + " disconnected with a Bye message.", "server");
+                screen.release();
+
+                messageOut = "S" + this.hourFormatter.format(LocalDateTime.now()) 
+                             + " | Server: Goodbye " + this.username;
+
+                // Send Bye to this client, so that it knows it's time to disconnect.
+                try {
+                    out.write("SBye"); // Letter S to format message at receiver.
+                    out.newLine();
+                    out.flush();
+                } catch (IOException ignored) {}
+
+                // Broadcast out message to all clients.
+                broadcast(messageOut);
+                
+                // Here we return true so that we can get out of the main loop and successfully 
+                // disconnect from the server.
+                // Therefore, the other cases of the case statement will return false.
+                return true;
+
+            case "AllUsers":
+            	
+            	// Creating the output for the "AllUsers" message.
+                messageOut = "\n\nSList of all users connected at " 
+                             + this.hourFormatter.format(LocalDateTime.now()) + "\n";
+                
+                Integer i = 1;
+                
+                try { mutex.acquire(); } catch (InterruptedException e) { e.printStackTrace(); }
+                for(var client : clients) {
+                    mutex.release();
+                    
+                    messageOut += "S" + i.toString() + ") " + client.username() + " since " 
+                        + this.hourDateFormatter.format(client.joinTimeDate()) + "\n\n";
+                    
+                    try { mutex.acquire(); } catch (InterruptedException e) { e.printStackTrace(); }
+                    
+                    ++i;
+                }
+                mutex.release();
+                
+                // Send message to receiver.
+                try {
+                    out.write(messageOut);
+                    out.newLine();
+                    out.flush();
+                } catch (IOException ignored) {}
+                
+                return false;
+
+            default:
+            	
+            	// In the default case, we just write the message on the server log 
+            	// and broadcast it.
+                messageOut = this.hourFormatter.format(LocalDateTime.now()) 
+                             + " | " + username + ": " + line;
+                
+                this.chatui.appendMessage(messageOut, "server");
+                broadcastExceptMine(messageOut);
+                
+                return false;
+        }
+    }
+
+    // Function to broadcast a message to every user.
+    private void broadcast(String msg) {
+        try { mutex.acquire(); } catch (InterruptedException e) { e.printStackTrace(); }
+        for(var client : clients) {
+            try {
+                BufferedWriter clientOut = new BufferedWriter(
+                        new OutputStreamWriter(client.socket().getOutputStream()));
+                clientOut.write(msg);
+                clientOut.newLine();
+                clientOut.flush();
+            } catch (IOException ignored) {}
+        }
+        mutex.release();
+    }
+    
+    // Function to broadcast a message to every user with the "I" prefix (incoming message).
+    // But the ClientReceiver connected to this ServerThread will receive 
+    // the prefix "O" (outgoing message). This is done with styling purposes.
+    private void broadcastExceptMine(String msg) {
+        try { mutex.acquire(); } catch (InterruptedException e) { e.printStackTrace(); }
+        for(var client : clients) {
+        	    	
+            try {
+                BufferedWriter clientOut = new BufferedWriter(
+                        new OutputStreamWriter(client.socket().getOutputStream()));
+                if(client.equals(actualClient))
+                	clientOut.write("O" + msg);
+                else
+                	clientOut.write("I" + msg);
+                clientOut.newLine();
+                clientOut.flush();
+            } catch (IOException ignored) {}
+        }
+        mutex.release();
+    }
+    
+    // Method used to close the connection through a natural way, which is, by a "Bye" message.
+    public void closeBye() {
+    	try { mutex.acquire(); } catch (InterruptedException e) { e.printStackTrace(); }
+        clients.remove(actualClient);
+        mutex.release();
+        running = false;
+        
+        // Here we put closed to true so that the "close" (for unexpected closing)
+        // method won't have any effect.
+        this.closed = true;
+    }
+    
+    // Method used to make the thread stop working.
+    public void close() {
+    	if(this.closed) return;
+    	
+        closed = true;
+        running = false;
+
+        // Notify clients.
+        broadcast("SServer is Being Closed - Bye");
+
+        // Remove from client list safely.
+        try { mutex.acquire(); } catch (InterruptedException e) { e.printStackTrace(); }
+        clients.remove(actualClient);
+        mutex.release();
+
+        // Force unblock of readLine().
+        try { if (socket != null && !socket.isClosed()) socket.close(); } catch (IOException ignored) {}
+        try { if (in != null) in.close(); } catch (IOException ignored) {}
+        try { if (out != null) out.close(); } catch (IOException ignored) {}
+    }
+}

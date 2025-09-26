@@ -1,0 +1,131 @@
+package communication;
+
+import java.net.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
+
+import application.ChatUI;
+import javafx.event.EventHandler;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+import javafx.stage.WindowEvent;
+
+import java.io.*;
+
+public class ClientSender extends Thread {
+
+	// Atributes
+	private Socket socket;
+	// We only need a way to send messages, since this thread will only send
+	// messages to the server.
+	private BufferedWriter out;
+	private String username;
+	private ChatUI chatui;
+
+	// Variables used to close the connection.
+	private volatile boolean running;
+	private boolean windowClosed;
+
+	// Data to go back to the menu.
+	private Stage originalStage;
+	private Scene originalScene;
+
+	// Constructor
+	public ClientSender(String address, int port, ChatUI chatui, Stage stage, Scene scene)
+			throws UnknownHostException, IOException, InterruptedException, ExecutionException {
+		this.chatui = chatui;
+		this.originalStage = stage;
+		this.originalScene = scene;
+		this.running = true;
+		this.windowClosed = false;
+
+		chatui.appendMessage("Introduce your user name: ", "server");
+		this.username = this.chatui.getMessage().get();
+
+		this.socket = new Socket(address, port);
+
+		chatui.appendMessage("Connection accepted with server " + socket, "server");
+
+		out = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+		
+		// Now, let's communicate the username to the corresponding ServerThread.
+		this.sendMsg(this.username);
+	}
+
+	// Main functions
+	@Override
+	public void run() {
+		try {
+			
+			this.chatui.appendIntroUser();
+			
+			// We pass a reference to ourselves so that the client receiver thread 
+			// can communicate us that the connections needs to be closed.
+			ClientReceiver receiver = new ClientReceiver(socket, this.chatui, this.username, this);
+			receiver.start();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		while (running) {
+		    try {
+		        Future<String> future = this.chatui.getMessage();
+		        String message = future.get();
+
+		        if (message == null || !running) break;
+
+		        this.sendMsg(message);
+
+		        if (message.equals("Bye")) {
+		            closeConnection();
+		            return;
+		        }
+
+		    } catch (InterruptedException e) {
+		        break; // allow exit on interrupt
+		    } catch (ExecutionException | IOException e) {
+		        e.printStackTrace();
+		        break;
+		    }
+		}
+		closeConnection();
+		
+		this.chatui.setOnCloseRequest(this.closeWindow());
+	}
+
+	// Method to send a given message through a BufferedWriter.
+	public void sendMsg(String msg) throws IOException {
+		this.out.write(msg);
+		this.out.newLine();
+		this.out.flush();
+	}
+	
+	// Function to grant the connection being closed on unexpected situations (server closing spontaneously).
+	public void stopClient() {
+        this.running = false;
+        this.interrupt();
+    }
+	
+	public EventHandler<WindowEvent> closeWindow() {
+		running = false;
+		this.windowClosed = true;
+        this.interrupt();
+		return null;
+	}
+	
+	public void isRunning() { return this.running; }
+
+	public void closeConnection() {
+		
+		try { Thread.sleep(2000); } catch (InterruptedException t) { /* Ignored */}
+		
+		// Switch back to menu using a javafx thread.
+		javafx.application.Platform.runLater(() -> {
+			this.originalStage.setScene(originalScene);
+			this.originalStage.setTitle("ChatsApp Menu");
+			this.originalStage.show();
+		});
+	}
+
+}

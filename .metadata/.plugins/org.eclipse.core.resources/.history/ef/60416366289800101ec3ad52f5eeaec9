@@ -1,0 +1,193 @@
+package application;
+
+import java.util.LinkedList;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
+import javafx.scene.image.Image;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+
+public class ChatUI extends Stage {
+
+    private boolean isHost;
+    private VBox chatArea;
+    private TextField inputField;
+    private Button sendBtn;
+    private LinkedList<String> messages;
+    private String css = getClass().getResource("styles.css").toExternalForm();
+    private Stage originalStage;
+    private Scene originalScene;
+    private Runnable onExitCallBack;
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private ScrollPane scrollPane;
+
+    public ChatUI(boolean isHost, LinkedList<String> messages, Stage stage, Scene scene1) {
+        this.isHost = isHost;
+        this.messages = messages;
+        this.originalStage = stage;
+        this.originalScene = scene1;
+
+        // Chat area
+        chatArea = new VBox(8);
+        chatArea.setPadding(new Insets(10));
+        chatArea.setFillWidth(true);
+        chatArea.getStyleClass().add("chat-area");
+
+        // Add spacer at the bottom to force VBox to fill ScrollPane
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+        chatArea.getChildren().add(spacer);
+
+        // ScrollPane wrapping chat area
+        scrollPane = new ScrollPane(chatArea);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+
+        // Root layout
+        BorderPane root = new BorderPane();
+        root.setCenter(scrollPane);
+
+        if (!isHost) {
+            // Client input
+            inputField = new TextField();
+            inputField.setPromptText("Type your message...");
+            inputField.getStyleClass().add("subtitle");
+
+            sendBtn = new Button("Send");
+            sendBtn.getStyleClass().add("send-btn");
+
+            HBox inputBox = new HBox(10, inputField, sendBtn);
+            inputBox.setPadding(new Insets(10));
+            HBox.setHgrow(inputField, Priority.ALWAYS);
+            root.setBottom(inputBox);
+
+            sendBtn.setOnAction(_ -> storeActualMessage());
+            inputField.setOnKeyPressed(e -> {
+                if (e.getCode() == javafx.scene.input.KeyCode.ENTER) storeActualMessage();
+            });
+
+        } else {
+            // Server exit button
+            Button exitBtn = new Button("Exit Server");
+            exitBtn.getStyleClass().add("exit-btn");
+            exitBtn.setOnAction(_ -> {
+                if (onExitCallBack != null) onExitCallBack.run();
+                this.close();
+            });
+            root.setBottom(exitBtn);
+            BorderPane.setAlignment(exitBtn, Pos.CENTER);
+        }
+
+        // Scene
+        Scene scene = new Scene(root, 500, 700);
+        scene.getStylesheets().add(css);
+        this.setScene(scene);
+        this.setTitle(isHost ? "Chat Host" : "Chat Client");
+
+        try {
+            Image img = new Image(getClass().getResourceAsStream("icon.png"));
+            this.getIcons().add(img);
+        } catch (Exception ignore) {}
+
+        // Window close
+        this.setOnCloseRequest(event -> {
+            if (onExitCallBack != null) onExitCallBack.run();
+            shutdown();
+        });
+
+        // Show intro messages
+        Platform.runLater(() -> {
+            if (!isHost)
+                appendIntroUser();
+            else
+                appendIntroServer();
+        });
+    }
+
+    // Add a message with alignment
+    private void addMessage(String text, String styleClass, Pos alignment) {
+        Label label = new Label(text);
+        label.setWrapText(true);
+        label.setMaxWidth(300);
+        label.setMinHeight(Region.USE_PREF_SIZE);
+
+        HBox container = new HBox(label);
+        container.setAlignment(alignment);
+        container.setFillHeight(true);
+        label.getStyleClass().add(styleClass);
+
+        // Insert above spacer
+        chatArea.getChildren().add(chatArea.getChildren().size() - 1, container);
+
+        // Auto-scroll
+        Platform.runLater(() -> scrollPane.setVvalue(1.0));
+    }
+
+    public void appendIntroUser() {
+        addMessage("Introduction to Message Types:", "message-server", Pos.CENTER);
+        addMessage("Your Messages will be Blue, and placed at the right of the screen.", "message-out", Pos.CENTER_RIGHT);
+        addMessage("Server's Messages will be Grey, and placed at the middle of the screen.", "message-server", Pos.CENTER);
+        addMessage("Other User's Messages will be Green, and placed at the left of the screen.", "message-in", Pos.CENTER_LEFT);
+    }
+
+    public void appendIntroServer() {
+        addMessage("This text panel will serve as a log of the messages sent in the chat by either the server or the users who take place in it.", "message-server", Pos.CENTER);
+    }
+
+    public void appendMessage(String message, String type) {
+        Platform.runLater(() -> {
+            switch (type) {
+                case "in": addMessage(message, "message-in", Pos.CENTER_LEFT); break;
+                case "out": addMessage(message, "message-out", Pos.CENTER_RIGHT); break;
+                case "server": addMessage(message, "message-server", Pos.CENTER); break;
+                default: addMessage(message, "message-normal", Pos.CENTER_LEFT); break;
+            }
+        });
+    }
+
+    public void storeActualMessage() {
+        String msg = inputField.getText().trim();
+        if (!msg.isEmpty()) {
+            synchronized (messages) {
+                messages.addLast(msg);
+                messages.notify();
+            }
+            inputField.clear();
+        }
+    }
+
+    public Future<String> getMessage() {
+        Callable<String> task = () -> {
+            synchronized (messages) {
+                while (messages.isEmpty()) messages.wait();
+                return messages.pop();
+            }
+        };
+        return executor.submit(task);
+    }
+
+    public void setOnExitCallback(Runnable onExitCallback) {
+        this.onExitCallBack = onExitCallback;
+    }
+
+    public void shutdown() {
+        if (!isHost) appendMessage("Bye", "out");
+        executor.shutdown();
+    }
+}

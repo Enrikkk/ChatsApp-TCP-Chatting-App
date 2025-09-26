@@ -1,0 +1,63 @@
+package communication;
+
+import java.io.*;
+import java.net.*;
+import java.util.*;
+
+import application.ChatUI;
+
+public class ServerAttender extends Thread {
+
+    private ServerSocket serverSocket;
+    private List<ServerThread> clients = Collections.synchronizedList(new ArrayList<>());
+    private ChatUI chatui;
+    private volatile boolean running = true;
+
+    public ServerAttender(int port, ChatUI chatui, javafx.stage.Stage stage, javafx.scene.Scene menuScene)
+            throws IOException {
+        this.serverSocket = new ServerSocket(port);
+        this.chatui = chatui;
+
+        // exit handling from UI
+        chatui.setOnExitCallback(this::closeServer);
+    }
+
+    @Override
+    public void run() {
+        try {
+            while (running) {
+                Socket clientSocket = serverSocket.accept();
+                ServerThread clientThread = new ServerThread(clientSocket, chatui, this);
+                clients.add(clientThread);
+                clientThread.start();
+            }
+        } catch (IOException e) {
+            if (running) e.printStackTrace();
+        }
+    }
+
+    public void broadcast(String message, ServerThread exclude) {
+        synchronized (clients) {
+            for (ServerThread client : clients) {
+                if (client != exclude) {
+                    client.sendMessage(message);
+                }
+            }
+        }
+    }
+
+    public void removeClient(ServerThread client) {
+        clients.remove(client);
+    }
+
+    public void closeServer() {
+        running = false;
+        try {
+            for (ServerThread client : clients) {
+                client.sendMessage("SServer is Being Closed - Bye");
+                client.stopThread();
+            }
+            serverSocket.close();
+        } catch (IOException ignored) {}
+    }
+}
