@@ -1,6 +1,4 @@
-Perfect! Here's a polished, GitHub-ready `README.md` with badges, collapsible sections, tables, and better formatting. It will look professional and clean for your repo.
 
-````markdown
 # 🎨 ChatsApp - TCP Chatting Application
 
 [![Java](https://img.shields.io/badge/Java-17+-blue.svg)](https://www.oracle.com/java/technologies/javase-downloads.html)
